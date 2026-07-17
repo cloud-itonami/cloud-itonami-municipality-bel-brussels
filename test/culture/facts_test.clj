@@ -1,0 +1,37 @@
+(ns culture.facts-test
+  (:require [clojure.edn :as edn]
+            [clojure.string :as str]
+            [clojure.test :refer [deftest is]]
+            [culture.facts :as facts]))
+
+(deftest brussels-has-culture-basis
+  (let [sb (facts/spec-basis "brussels")]
+    (is (= 9 (count sb)))
+    (is (= (count sb) (count (set (map :culture/id sb)))))
+    (is (every? #(str/starts-with? (:culture/url %) "https://") sb))
+    (is (every? #(= "brussels" (:culture/municipality %)) sb))
+    (is (every? #(= "BEL" (:culture/country %)) sb))
+    (is (every? #(seq (:culture/summary %)) sb))
+    (is (every? #(string? (:culture/retrieved-at %)) sb))))
+
+(deftest unknown-municipality-has-no-basis
+  (is (nil? (facts/spec-basis "antwerp")))
+  (is (nil? (facts/spec-basis "zzz"))))
+
+(deftest coverage-is-honest
+  (let [c (facts/coverage ["brussels" "antwerp"])]
+    (is (= 2 (:requested c)))
+    (is (= 1 (:covered c)))
+    (is (= ["antwerp"] (:missing-municipalities c)))))
+
+(deftest by-kind-filters
+  (is (= 3 (count (facts/by-kind "brussels" :dish))))
+  (is (= ["brussels.beverage.lambic"]
+         (mapv :culture/id (facts/by-kind "brussels" :beverage))))
+  (is (= 1 (count (facts/by-kind "brussels" :craft))))
+  (is (empty? (facts/by-kind "antwerp" :dish))))
+
+(deftest tx-file-matches-catalog
+  (let [tx (edn/read-string (slurp "data/culture-tx.edn"))
+        flat (mapcat val (sort-by key facts/catalog))]
+    (is (= (vec flat) (vec tx)))))
